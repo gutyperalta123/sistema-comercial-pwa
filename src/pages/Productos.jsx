@@ -1,7 +1,5 @@
-
-
-
 import { useEffect, useRef, useState } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 
 export default function Productos({
   esAdmin,
@@ -28,18 +26,16 @@ export default function Productos({
   const [scannerDestino, setScannerDestino] = useState(null);
   const [scannerMensaje, setScannerMensaje] = useState("");
   const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const scannerActivoRef = useRef(false);
+  const controlesScannerRef = useRef(null);
 
   const detenerScanner = () => {
-    scannerActivoRef.current = false;
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
+    if (controlesScannerRef.current) {
+      controlesScannerRef.current.stop();
+      controlesScannerRef.current = null;
     }
 
-    if (videoRef.current) {
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
       videoRef.current.srcObject = null;
     }
   };
@@ -81,73 +77,43 @@ export default function Productos({
       try {
         if (!navigator.mediaDevices?.getUserMedia) {
           setScannerMensaje(
-            "Este celular o navegador no permite usar la cámara desde la web. Probá con Chrome y la app abierta con HTTPS."
+            "Este celular o navegador no permite usar la cámara desde la web. Abrí la app con HTTPS."
           );
           return;
         }
 
-        if (!("BarcodeDetector" in window)) {
-          setScannerMensaje(
-            "Tu navegador no tiene lector de código de barras incorporado. Probá con Chrome actualizado en Android."
-          );
-          return;
+        setScannerMensaje("Preparando cámara...");
+
+        const lector = new BrowserMultiFormatReader();
+
+        const dispositivos = await BrowserMultiFormatReader.listVideoInputDevices();
+
+        let dispositivoTrasero = dispositivos.find((dispositivo) =>
+          /back|rear|environment|trasera|posterior/i.test(dispositivo.label)
+        );
+
+        if (!dispositivoTrasero && dispositivos.length > 0) {
+          dispositivoTrasero = dispositivos[dispositivos.length - 1];
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-          },
-          audio: false,
-        });
+        if (cancelado) return;
 
-        if (cancelado) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-
-        streamRef.current = stream;
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-
-        const formatos = [
-          "ean_13",
-          "ean_8",
-          "upc_a",
-          "upc_e",
-          "code_128",
-          "code_39",
-          "itf",
-        ];
-
-        const detector = new window.BarcodeDetector({ formats: formatos });
-        scannerActivoRef.current = true;
-        setScannerMensaje("Apuntá la cámara al código de barras.");
-
-        const detectar = async () => {
-          if (!scannerActivoRef.current || !videoRef.current) return;
-
-          try {
-            const codigos = await detector.detect(videoRef.current);
-
-            if (codigos.length > 0) {
-              aplicarCodigoEscaneado(codigos[0].rawValue);
-              return;
+        const controles = await lector.decodeFromVideoDevice(
+          dispositivoTrasero?.deviceId,
+          videoRef.current,
+          (resultado) => {
+            if (resultado) {
+              aplicarCodigoEscaneado(resultado.getText());
             }
-          } catch (error) {
-            console.error(error);
           }
+        );
 
-          requestAnimationFrame(detectar);
-        };
-
-        detectar();
+        controlesScannerRef.current = controles;
+        setScannerMensaje("Apuntá la cámara al código de barras.");
       } catch (error) {
         console.error(error);
         setScannerMensaje(
-          "No se pudo abrir la cámara. Revisá permisos del navegador y que la página esté en HTTPS."
+          "No se pudo abrir la cámara. Revisá permisos del navegador y que la app esté abierta con HTTPS."
         );
       }
     };
