@@ -1,5 +1,12 @@
+
+
+
+
+
+
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
+import { buscarDatosProductoPorCodigo } from "../services/productoDatosService";
 
 export default function Productos({
   esAdmin,
@@ -27,6 +34,7 @@ export default function Productos({
   const [scannerMensaje, setScannerMensaje] = useState("");
   const videoRef = useRef(null);
   const controlesScannerRef = useRef(null);
+  const ultimaLecturaRef = useRef("");
 
   const detenerScanner = () => {
     if (controlesScannerRef.current) {
@@ -40,29 +48,56 @@ export default function Productos({
     }
   };
 
-  const aplicarCodigoEscaneado = (codigoDetectado) => {
+  const aplicarCodigoEscaneado = async (codigoDetectado) => {
     const codigoLimpio = String(codigoDetectado || "").trim();
 
     if (!codigoLimpio) return;
 
+    if (ultimaLecturaRef.current === codigoLimpio) return;
+    ultimaLecturaRef.current = codigoLimpio;
+
     if (scannerDestino === "producto") {
-      setNuevoProducto({
-        ...nuevoProducto,
+      setNuevoProducto((productoActual) => ({
+        ...productoActual,
         codigo: codigoLimpio,
-      });
+      }));
+
+      setScannerMensaje("Código leído. Buscando datos del producto...");
+
+      try {
+        const datosProducto = await buscarDatosProductoPorCodigo(codigoLimpio);
+
+        if (datosProducto) {
+          setNuevoProducto((productoActual) => ({
+            ...productoActual,
+            codigo: codigoLimpio,
+            nombre: productoActual.nombre || datosProducto.nombre || "",
+            marca: productoActual.marca || datosProducto.marca || "",
+            categoria: productoActual.categoria || datosProducto.categoria || "",
+          }));
+
+          setScannerMensaje("Datos encontrados y completados automáticamente.");
+        } else {
+          setScannerMensaje("Código leído. No encontré datos automáticos, completalo manualmente.");
+        }
+      } catch (error) {
+        console.error(error);
+        setScannerMensaje("Código leído. No se pudieron traer datos automáticos.");
+      }
     }
 
     if (scannerDestino === "stock") {
       setCodigoCargaRapida(codigoLimpio);
+      setScannerMensaje(`Código escaneado: ${codigoLimpio}`);
     }
 
     detenerScanner();
     setScannerAbierto(false);
     setScannerDestino(null);
-    setScannerMensaje(`Código escaneado: ${codigoLimpio}`);
   };
 
   const abrirScanner = (destino) => {
+    ultimaLecturaRef.current = "";
     setScannerDestino(destino);
     setScannerMensaje("");
     setScannerAbierto(true);
@@ -84,36 +119,72 @@ export default function Productos({
 
         setScannerMensaje("Preparando cámara...");
 
-        const lector = new BrowserMultiFormatReader();
+        const lector = new BrowserMultiFormatReader(undefined, 300);
 
-        const dispositivos = await BrowserMultiFormatReader.listVideoInputDevices();
+        const constraints = {
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        };
 
-        let dispositivoTrasero = dispositivos.find((dispositivo) =>
-          /back|rear|environment|trasera|posterior/i.test(dispositivo.label)
-        );
-
-        if (!dispositivoTrasero && dispositivos.length > 0) {
-          dispositivoTrasero = dispositivos[dispositivos.length - 1];
-        }
-
-        if (cancelado) return;
-
-        const controles = await lector.decodeFromVideoDevice(
-          dispositivoTrasero?.deviceId,
-          videoRef.current,
-          (resultado) => {
-            if (resultado) {
-              aplicarCodigoEscaneado(resultado.getText());
-            }
+        const onResultado = (resultado, error, controles) => {
+          if (controles && !controlesScannerRef.current) {
+            controlesScannerRef.current = controles;
           }
-        );
 
-        controlesScannerRef.current = controles;
-        setScannerMensaje("Apuntá la cámara al código de barras.");
+          if (resultado) {
+            aplicarCodigoEscaneado(resultado.getText());
+          }
+        };
+
+        try {
+          const controles = await lector.decodeFromConstraints(
+            constraints,
+            videoRef.current,
+            onResultado
+          );
+
+          if (cancelado) {
+            controles.stop();
+            return;
+          }
+
+          controlesScannerRef.current = controles;
+          setScannerMensaje("Apuntá la cámara al código de barras.");
+        } catch (errorConConstraints) {
+          console.error(errorConConstraints);
+
+          const dispositivos = await BrowserMultiFormatReader.listVideoInputDevices();
+
+          let dispositivoTrasero = dispositivos.find((dispositivo) =>
+            /back|rear|environment|trasera|posterior/i.test(dispositivo.label)
+          );
+
+          if (!dispositivoTrasero && dispositivos.length > 0) {
+            dispositivoTrasero = dispositivos[dispositivos.length - 1];
+          }
+
+          const controles = await lector.decodeFromVideoDevice(
+            dispositivoTrasero?.deviceId,
+            videoRef.current,
+            onResultado
+          );
+
+          if (cancelado) {
+            controles.stop();
+            return;
+          }
+
+          controlesScannerRef.current = controles;
+          setScannerMensaje("Apuntá la cámara al código de barras.");
+        }
       } catch (error) {
         console.error(error);
         setScannerMensaje(
-          "No se pudo abrir la cámara. Revisá permisos del navegador y que la app esté abierta con HTTPS."
+          "No se pudo abrir o leer la cámara. Revisá permisos, buena luz y que la app esté abierta con HTTPS."
         );
       }
     };
