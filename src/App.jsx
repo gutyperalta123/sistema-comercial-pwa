@@ -1,9 +1,7 @@
 
 
 
-
-
-
+import { buscarDatosProductoPorCodigo } from "./services/productoDatosService";
 import { useEffect, useState } from "react";
 import "./App.css";
 import CierreCaja from "./pages/CierreCaja";
@@ -581,73 +579,125 @@ export default function App() {
   };
 
   const cargarStockConLector = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const codigoEscaneado = codigoCargaRapida.trim();
-    const cantidad = Number(cantidadCargaRapida || 1);
+  const codigoEscaneado = codigoCargaRapida.trim();
+  const cantidad = Number(cantidadCargaRapida || 1);
 
-    if (!codigoEscaneado) {
-      alert("Escaneá un código de barras");
-      return;
-    }
+  if (!codigoEscaneado) {
+    alert("Escaneá un código de barras");
+    return;
+  }
 
-    if (!cantidad || cantidad <= 0) {
-      alert("Ingresá una cantidad válida");
-      return;
-    }
+  if (!cantidad || cantidad <= 0) {
+    alert("Ingresá una cantidad válida");
+    return;
+  }
 
-    const productoEncontrado = productos.find(
-      (producto) =>
-        producto.activo && String(producto.codigo).trim() === codigoEscaneado
-    );
+  const productoEncontrado = productos.find(
+    (producto) =>
+      producto.activo && String(producto.codigo).trim() === codigoEscaneado
+  );
 
-    if (!productoEncontrado) {
-      alert("Producto no encontrado. Primero cargalo con ese código de barras.");
-      setCodigoCargaRapida("");
-      return;
-    }
-
+  if (!productoEncontrado) {
     try {
-      const nuevoStock = Number(productoEncontrado.stock || 0) + cantidad;
+      const datosProducto = await buscarDatosProductoPorCodigo(codigoEscaneado);
 
-      await sumarStockProducto(productoEncontrado.id, nuevoStock);
-
-      await crearMovimientoStock({
-        productoId: productoEncontrado.id,
-        codigo: productoEncontrado.codigo,
-        producto: productoEncontrado.nombre,
-        tipo: "Ingreso",
-        cantidad,
-        motivo: "Ingreso por lector",
-        usuario: usuarioActual.nombre,
+      setNuevoProducto({
+        codigo: codigoEscaneado,
+        nombre: datosProducto?.nombre || "",
+        marca: datosProducto?.marca || "",
+        categoria: datosProducto?.categoria || "",
+        precioCompra: "",
+        precioVenta: "",
+        stock: cantidadCargaRapida || "",
+        minimo: "",
+        proveedor: "",
+        vencimiento: vencimientoCargaRapida || "",
       });
 
-      if (vencimientoCargaRapida) {
-        await crearLoteProducto({
-          productoId: productoEncontrado.id,
-          cantidad,
-          vencimiento: vencimientoCargaRapida,
-        });
+      setCodigoCargaRapida("");
+      setPantalla("productos");
 
-        await cargarLotes();
+      if (datosProducto) {
+        alert(
+          "Producto no estaba cargado. Encontré datos automáticos y los pasé al formulario de Alta de producto. Completá precio, proveedor y guardalo."
+        );
+      } else {
+        alert(
+          "Producto no estaba cargado. No encontré datos automáticos. Lo pasé al formulario de Alta de producto para completarlo manualmente."
+        );
       }
 
-      setProductoCargaRapida({
-        ...productoEncontrado,
-        stock: nuevoStock,
+      return;
+    } catch (error) {
+      console.error(error);
+
+      setNuevoProducto({
+        codigo: codigoEscaneado,
+        nombre: "",
+        marca: "",
+        categoria: "",
+        precioCompra: "",
+        precioVenta: "",
+        stock: cantidadCargaRapida || "",
+        minimo: "",
+        proveedor: "",
+        vencimiento: vencimientoCargaRapida || "",
       });
 
       setCodigoCargaRapida("");
+      setPantalla("productos");
 
-      await cargarProductos();
-      await cargarMovimientosStock();
+      alert(
+        "Producto no estaba cargado. No se pudieron buscar datos automáticos. Lo pasé al formulario de Alta de producto."
+      );
 
-      alert(`Se agregaron ${cantidad} unidades de ${productoEncontrado.nombre}`);
-    } catch (error) {
-      console.error(error);
-      alert("Error al sumar stock: " + error.message);
+      return;
     }
-  };
+  }
+
+  try {
+    const nuevoStock = Number(productoEncontrado.stock || 0) + cantidad;
+
+    await sumarStockProducto(productoEncontrado.id, nuevoStock);
+
+    await crearMovimientoStock({
+      productoId: productoEncontrado.id,
+      codigo: productoEncontrado.codigo,
+      producto: productoEncontrado.nombre,
+      tipo: "Ingreso",
+      cantidad,
+      motivo: "Ingreso por lector",
+      usuario: usuarioActual.nombre,
+    });
+
+    if (vencimientoCargaRapida) {
+      await crearLoteProducto({
+        productoId: productoEncontrado.id,
+        cantidad,
+        vencimiento: vencimientoCargaRapida,
+      });
+
+      await cargarLotes();
+    }
+
+    setProductoCargaRapida({
+      ...productoEncontrado,
+      stock: nuevoStock,
+    });
+
+    setCodigoCargaRapida("");
+
+    await cargarProductos();
+    await cargarMovimientosStock();
+
+    alert(`Se agregaron ${cantidad} unidades de ${productoEncontrado.nombre}`);
+  } catch (error) {
+    console.error(error);
+    alert("Error al sumar stock: " + error.message);
+  }
+};
 
   const productosFiltrados = productos.filter(
     (producto) =>
