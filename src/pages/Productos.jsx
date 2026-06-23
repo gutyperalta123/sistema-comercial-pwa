@@ -1,9 +1,6 @@
 
 
 
-
-
-
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { buscarDatosProductoPorCodigo } from "../services/productoDatosService";
@@ -32,9 +29,12 @@ export default function Productos({
   const [scannerAbierto, setScannerAbierto] = useState(false);
   const [scannerDestino, setScannerDestino] = useState(null);
   const [scannerMensaje, setScannerMensaje] = useState("");
+  const [buscandoDatos, setBuscandoDatos] = useState(false);
+
   const videoRef = useRef(null);
   const controlesScannerRef = useRef(null);
   const ultimaLecturaRef = useRef("");
+  const ultimoCodigoBuscadoRef = useRef("");
 
   const detenerScanner = () => {
     if (controlesScannerRef.current) {
@@ -45,6 +45,35 @@ export default function Productos({
     if (videoRef.current?.srcObject) {
       videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
       videoRef.current.srcObject = null;
+    }
+  };
+
+  const completarDatosAutomaticos = async (codigoLimpio) => {
+    if (!codigoLimpio || codigoLimpio.length < 8) return;
+
+    if (ultimoCodigoBuscadoRef.current === codigoLimpio) return;
+    ultimoCodigoBuscadoRef.current = codigoLimpio;
+
+    try {
+      setBuscandoDatos(true);
+
+      const datosProducto = await buscarDatosProductoPorCodigo(codigoLimpio);
+
+      if (!datosProducto) {
+        return;
+      }
+
+      setNuevoProducto((actual) => ({
+        ...actual,
+        codigo: codigoLimpio,
+        nombre: actual.nombre || datosProducto.nombre || "",
+        marca: actual.marca || datosProducto.marca || "",
+        categoria: actual.categoria || datosProducto.categoria || "",
+      }));
+    } catch (error) {
+      console.error("No se pudieron traer datos automáticos:", error);
+    } finally {
+      setBuscandoDatos(false);
     }
   };
 
@@ -63,27 +92,7 @@ export default function Productos({
       }));
 
       setScannerMensaje("Código leído. Buscando datos del producto...");
-
-      try {
-        const datosProducto = await buscarDatosProductoPorCodigo(codigoLimpio);
-
-        if (datosProducto) {
-          setNuevoProducto((productoActual) => ({
-            ...productoActual,
-            codigo: codigoLimpio,
-            nombre: productoActual.nombre || datosProducto.nombre || "",
-            marca: productoActual.marca || datosProducto.marca || "",
-            categoria: productoActual.categoria || datosProducto.categoria || "",
-          }));
-
-          setScannerMensaje("Datos encontrados y completados automáticamente.");
-        } else {
-          setScannerMensaje("Código leído. No encontré datos automáticos, completalo manualmente.");
-        }
-      } catch (error) {
-        console.error(error);
-        setScannerMensaje("Código leído. No se pudieron traer datos automáticos.");
-      }
+      await completarDatosAutomaticos(codigoLimpio);
     }
 
     if (scannerDestino === "stock") {
@@ -102,6 +111,45 @@ export default function Productos({
     setScannerMensaje("");
     setScannerAbierto(true);
   };
+
+  useEffect(() => {
+    const codigo = String(nuevoProducto.codigo || "").trim();
+
+    if (!codigo || codigo.length < 8) return;
+    if (nuevoProducto.nombre || nuevoProducto.marca || nuevoProducto.categoria) return;
+
+    let cancelado = false;
+
+    const buscarAutomaticamente = async () => {
+      try {
+        setBuscandoDatos(true);
+
+        const datos = await buscarDatosProductoPorCodigo(codigo);
+
+        if (!datos || cancelado) return;
+
+        setNuevoProducto((actual) => ({
+          ...actual,
+          codigo,
+          nombre: actual.nombre || datos.nombre || "",
+          marca: actual.marca || datos.marca || "",
+          categoria: actual.categoria || datos.categoria || "",
+        }));
+      } catch (error) {
+        console.error("No se pudieron traer datos automáticos:", error);
+      } finally {
+        if (!cancelado) {
+          setBuscandoDatos(false);
+        }
+      }
+    };
+
+    buscarAutomaticamente();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [nuevoProducto.codigo]);
 
   useEffect(() => {
     if (!scannerAbierto) return;
@@ -281,15 +329,19 @@ export default function Productos({
 
           <div className="panel mb-4 p-3 border">
             <h5 className="fw-bold mb-2">
-              {productoEditando
-                ? "Editar producto"
-                : "Alta de producto nuevo"}
+              {productoEditando ? "Editar producto" : "Alta de producto nuevo"}
             </h5>
 
             <div className="alert alert-warning py-2">
               Esta parte solo debe usarla el administrador. Acá se cargan o se
               cambian precios y datos del producto.
             </div>
+
+            {buscandoDatos && (
+              <div className="alert alert-info py-2">
+                Buscando datos automáticos del producto...
+              </div>
+            )}
 
             <form onSubmit={guardarProducto} className="row g-2">
               <div className="col-12 col-md-3">
@@ -448,9 +500,7 @@ export default function Productos({
 
               <div className="col-12 col-md-3">
                 <button className="btn btn-primary w-100">
-                  {productoEditando
-                    ? "Actualizar producto"
-                    : "Guardar producto"}
+                  {productoEditando ? "Actualizar producto" : "Guardar producto"}
                 </button>
               </div>
 
@@ -527,9 +577,7 @@ export default function Productos({
                   <td>
                     <span
                       className={
-                        producto.activo
-                          ? "badge bg-success"
-                          : "badge bg-secondary"
+                        producto.activo ? "badge bg-success" : "badge bg-secondary"
                       }
                     >
                       {producto.activo ? "Activo" : "Desactivado"}
