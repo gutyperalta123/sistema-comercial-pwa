@@ -1,6 +1,5 @@
 
 
-
 import { buscarDatosProductoPorCodigo } from "./services/productoDatosService";
 import { useEffect, useState } from "react";
 import "./App.css";
@@ -22,7 +21,8 @@ import Configuracion from "./pages/Configuracion";
 import Ticket from "./pages/Ticket";
 import AjustesStock from "./pages/AjustesStock";
 import Promociones from "./pages/Promociones";
-
+import PanelMaestro from "./pages/PanelMaestro";
+import { loginSuperAdmin } from "./services/maestroService";
 import {
   obtenerPromociones,
   crearPromocion as crearPromocionService,
@@ -121,6 +121,7 @@ export default function App() {
   const [solicitudesCaja, setSolicitudesCaja] = useState([]);
   const [promociones, setPromociones] = useState([]);
   const [usuarioActual, setUsuarioActual] = useState(null);
+  const [esSuperAdmin, setEsSuperAdmin] = useState(false);
   const [configuracion, setConfiguracion] = useState(null);
 
   const [busquedaProducto, setBusquedaProducto] = useState("");
@@ -189,7 +190,7 @@ export default function App() {
   const esAdmin = usuarioActual?.rol === "Administrador";
 
   useEffect(() => {
-    if (logueado) {
+    if (logueado && !esSuperAdmin) {
       cargarProductos();
       cargarHistorialVentas();
       cargarPedidos();
@@ -203,10 +204,10 @@ export default function App() {
       cargarSolicitudesCaja();
       cargarPromociones();
     }
-  }, [logueado]);
+  }, [logueado, esSuperAdmin]);
 
   useEffect(() => {
-    if (!logueado) return;
+    if (!logueado || esSuperAdmin) return;
 
     const pantallasSoloAdmin = [
       "dashboard",
@@ -224,7 +225,7 @@ export default function App() {
     if (!esAdmin && pantallasSoloAdmin.includes(pantalla)) {
       setPantalla("venta");
     }
-  }, [pantalla, esAdmin, logueado]);
+  }, [pantalla, esAdmin, logueado, esSuperAdmin]);
 
   const cargarPromociones = async () => {
     try {
@@ -273,9 +274,25 @@ export default function App() {
 
   const iniciarSesion = async (e) => {
     e.preventDefault();
+
     if (!loginData.usuario || !loginData.password) {
       alert("Ingresá usuario y contraseña");
       return;
+    }
+
+    try {
+      const superAdmin = await loginSuperAdmin(
+        loginData.usuario,
+        loginData.password
+      );
+
+      setUsuarioActual(superAdmin);
+      setEsSuperAdmin(true);
+      setLogueado(true);
+      setPantalla("panel-maestro");
+      return;
+    } catch {
+      // Si no es super admin, continúa con el login normal del negocio.
     }
 
     try {
@@ -296,6 +313,7 @@ export default function App() {
       };
 
       setUsuarioActual(usuarioSistema);
+      setEsSuperAdmin(false);
       await asegurarAperturaCajaUsuario(usuarioSistema);
       setUltimoCierreResultado(null);
 
@@ -308,6 +326,8 @@ export default function App() {
   };
 
   const cerrarSesion = () => {
+    
+    setEsSuperAdmin(false);
     setLogueado(false);
     setUsuarioActual(null);
     setLoginData({ usuario: "", password: "" });
@@ -422,7 +442,6 @@ export default function App() {
       return [];
     }
   };
-
   const asegurarAperturaCajaUsuario = async (usuario) => {
     try {
       const aperturasBase = await obtenerAperturasCaja();
@@ -1764,6 +1783,10 @@ export default function App() {
         iniciarSesion={iniciarSesion}
       />
     );
+  }
+
+  if (esSuperAdmin) {
+    return <PanelMaestro cerrarSesion={cerrarSesion} />;
   }
 
   return (
