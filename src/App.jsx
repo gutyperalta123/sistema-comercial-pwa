@@ -1,5 +1,8 @@
 
 
+
+import { useAuthSession } from "./hooks/useAuthSession";
+import { usePromociones } from "./hooks/usePromociones";
 import { useUsuarios } from "./hooks/useUsuarios";
 import { useConfiguracion } from "./hooks/useConfiguracion";
 import { useProductos } from "./hooks/useProductos";
@@ -126,7 +129,7 @@ export default function App() {
   const [cierresCaja, setCierresCaja] = useState([]);
   const [aperturasCaja, setAperturasCaja] = useState([]);
   const [solicitudesCaja, setSolicitudesCaja] = useState([]);
-  const [promociones, setPromociones] = useState([]);
+  
   const [usuarioActual, setUsuarioActual] = useState(null);
   const [esSuperAdmin, setEsSuperAdmin] = useState(false);
   
@@ -202,6 +205,16 @@ export default function App() {
 
 
   const {
+  promociones,
+  setPromociones,
+  cargarPromociones,
+  crearPromocion,
+  cambiarEstadoPromocion,
+  eliminarPromocion,
+  } = usePromociones();
+
+
+  const {
     configuracion,
     setConfiguracion,
     cargarConfiguracion,
@@ -234,6 +247,13 @@ export default function App() {
   setPantalla,
   asegurarAperturaCajaUsuario,
   setUltimoCierreResultado,
+  });
+
+  const { cerrarSesionSistema } = useAuthSession({
+    usuarioActual,
+    setUsuarioActual,
+    setLogueado,
+    setEsSuperAdmin,
   });
 
   useEffect(() => {
@@ -274,50 +294,13 @@ export default function App() {
     }
   }, [pantalla, esAdmin, logueado, esSuperAdmin]);
 
-  const cargarPromociones = async () => {
-    try {
-      const promocionesBase = await obtenerPromociones();
-      setPromociones(promocionesBase);
-    } catch (error) {
-      console.error(error);
-      alert("Error al cargar promociones");
-    }
-  };
   
-  const crearPromocion = async (promo) => {
-    try {
-      await crearPromocionService(promo);
-      await cargarPromociones();
-      alert("Promoción creada correctamente");
-    } catch (error) {
-      console.error(error);
-      alert("Error al crear promoción: " + error.message);
-    }
-  };
   
-  const cambiarEstadoPromocion = async (id, activa) => {
-    try {
-      await cambiarEstadoPromocionService(id, activa);
-      await cargarPromociones();
-    } catch (error) {
-      console.error(error);
-      alert("Error al cambiar estado de promoción");
-    }
-  };
   
-  const eliminarPromocion = async (id) => {
-    const confirmar = confirm("¿Eliminar esta promoción?");
   
-    if (!confirmar) return;
   
-    try {
-      await eliminarPromocionService(id);
-      await cargarPromociones();
-    } catch (error) {
-      console.error(error);
-      alert("Error al eliminar promoción");
-    }
-  };
+  
+  
 
   const iniciarSesion = async (e) => {
     e.preventDefault();
@@ -331,10 +314,7 @@ export default function App() {
   };
 
   const cerrarSesion = () => {
-    
-    setEsSuperAdmin(false);
-    setLogueado(false);
-    setUsuarioActual(null);
+    cerrarSesionSistema();
     setLoginData({ usuario: "", password: "" });
     setPantalla("dashboard");
     setVentaActual([]);
