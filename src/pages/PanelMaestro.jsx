@@ -6,14 +6,16 @@ import {
   obtenerDetalleNegocioMaestro,
   suspenderNegocioMaestro,
   reactivarNegocioMaestro,
+  obtenerAdministradorDeNegocio,
 } from "../services/maestroService";
+import CatalogoGlobalMaestro from "../components/maestro/CatalogoGlobalMaestro";
 import DashboardMaestro from "../components/maestro/DashboardMaestro";
 import TablaNegocios from "../components/maestro/TablaNegocios";
 import ModalCrearNegocio from "../components/maestro/ModalCrearNegocio";
 import ModalEditarNegocio from "../components/maestro/ModalEditarNegocio";
 import ModalVerNegocio from "../components/maestro/ModalVerNegocio";
 
-export default function PanelMaestro({ cerrarSesion }) {
+export default function PanelMaestro({ cerrarSesion, entrarComoNegocio }) {
   const [negocios, setNegocios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [modalCrearAbierto, setModalCrearAbierto] = useState(false);
@@ -93,12 +95,12 @@ export default function PanelMaestro({ cerrarSesion }) {
     }
   };
 
-  const cambiarEstadoRapido = async (negocio) => {
+  const cambiarEstadoNegocio = async (negocio) => {
     const estaActivo = negocio.estado === "Activo";
 
     const confirmar = confirm(
       estaActivo
-        ? `¿Querés suspender "${negocio.nombre}"? El cliente no debería poder usar el sistema.`
+        ? `¿Querés suspender "${negocio.nombre}"?`
         : `¿Querés reactivar "${negocio.nombre}"?`
     );
 
@@ -109,16 +111,40 @@ export default function PanelMaestro({ cerrarSesion }) {
 
       if (estaActivo) {
         await suspenderNegocioMaestro(negocio.id);
-        alert("Negocio suspendido correctamente");
       } else {
         await reactivarNegocioMaestro(negocio.id);
-        alert("Negocio reactivado correctamente");
       }
 
       await cargarNegocios();
     } catch (error) {
       console.error(error);
       alert("Error al cambiar estado del negocio: " + error.message);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const ingresarAlNegocio = async (negocio) => {
+    const confirmar = confirm(
+      `¿Querés ingresar como administrador a "${negocio.nombre}"?`
+    );
+
+    if (!confirmar) return;
+
+    try {
+      setGuardando(true);
+
+      const admin = await obtenerAdministradorDeNegocio(negocio.id);
+
+      entrarComoNegocio({
+        ...admin,
+        negocio: negocio.nombre,
+        negocioId: negocio.id,
+        ingresoSoporte: true,
+      });
+    } catch (error) {
+      console.error(error);
+      alert("Error al ingresar al negocio: " + error.message);
     } finally {
       setGuardando(false);
     }
@@ -145,9 +171,11 @@ export default function PanelMaestro({ cerrarSesion }) {
         onCrearNegocio={() => setModalCrearAbierto(true)}
         onEditarNegocio={abrirEditarNegocio}
         onVerNegocio={abrirVerNegocio}
-        onCambiarEstadoNegocio={cambiarEstadoRapido}
+        onIngresarNegocio={ingresarAlNegocio}
+        onCambiarEstadoNegocio={cambiarEstadoNegocio}
         guardando={guardando}
       />
+      <CatalogoGlobalMaestro />
 
       <ModalCrearNegocio
         abierto={modalCrearAbierto}

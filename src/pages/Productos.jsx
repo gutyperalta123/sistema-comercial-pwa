@@ -1,6 +1,3 @@
-
-
-
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { buscarDatosProductoPorCodigo } from "../services/productoDatosService";
@@ -59,9 +56,7 @@ export default function Productos({
 
       const datosProducto = await buscarDatosProductoPorCodigo(codigoLimpio);
 
-      if (!datosProducto) {
-        return;
-      }
+      if (!datosProducto) return;
 
       setNuevoProducto((actual) => ({
         ...actual,
@@ -69,6 +64,7 @@ export default function Productos({
         nombre: actual.nombre || datosProducto.nombre || "",
         marca: actual.marca || datosProducto.marca || "",
         categoria: actual.categoria || datosProducto.categoria || "",
+        presentacion: actual.presentacion || datosProducto.presentacion || "",
       }));
     } catch (error) {
       console.error("No se pudieron traer datos automáticos:", error);
@@ -116,7 +112,14 @@ export default function Productos({
     const codigo = String(nuevoProducto.codigo || "").trim();
 
     if (!codigo || codigo.length < 8) return;
-    if (nuevoProducto.nombre || nuevoProducto.marca || nuevoProducto.categoria) return;
+
+    const yaTieneDatos =
+      nuevoProducto.nombre ||
+      nuevoProducto.marca ||
+      nuevoProducto.categoria ||
+      nuevoProducto.presentacion;
+
+    if (yaTieneDatos) return;
 
     let cancelado = false;
 
@@ -134,13 +137,12 @@ export default function Productos({
           nombre: actual.nombre || datos.nombre || "",
           marca: actual.marca || datos.marca || "",
           categoria: actual.categoria || datos.categoria || "",
+          presentacion: actual.presentacion || datos.presentacion || "",
         }));
       } catch (error) {
         console.error("No se pudieron traer datos automáticos:", error);
       } finally {
-        if (!cancelado) {
-          setBuscandoDatos(false);
-        }
+        if (!cancelado) setBuscandoDatos(false);
       }
     };
 
@@ -149,7 +151,14 @@ export default function Productos({
     return () => {
       cancelado = true;
     };
-  }, [nuevoProducto.codigo]);
+  }, [
+    nuevoProducto.codigo,
+    nuevoProducto.nombre,
+    nuevoProducto.marca,
+    nuevoProducto.categoria,
+    nuevoProducto.presentacion,
+    setNuevoProducto,
+  ]);
 
   useEffect(() => {
     if (!scannerAbierto) return;
@@ -205,7 +214,8 @@ export default function Productos({
         } catch (errorConConstraints) {
           console.error(errorConConstraints);
 
-          const dispositivos = await BrowserMultiFormatReader.listVideoInputDevices();
+          const dispositivos =
+            await BrowserMultiFormatReader.listVideoInputDevices();
 
           let dispositivoTrasero = dispositivos.find((dispositivo) =>
             /back|rear|environment|trasera|posterior/i.test(dispositivo.label)
@@ -350,12 +360,18 @@ export default function Productos({
                     className="form-control"
                     placeholder="Código de barras"
                     value={nuevoProducto.codigo}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const codigo = e.target.value;
+
                       setNuevoProducto({
                         ...nuevoProducto,
-                        codigo: e.target.value,
-                      })
-                    }
+                        codigo,
+                      });
+
+                      if (codigo !== ultimoCodigoBuscadoRef.current) {
+                        ultimoCodigoBuscadoRef.current = "";
+                      }
+                    }}
                   />
                   <button
                     type="button"
@@ -405,6 +421,20 @@ export default function Productos({
                     setNuevoProducto({
                       ...nuevoProducto,
                       categoria: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="col-12 col-md-3">
+                <input
+                  className="form-control"
+                  placeholder="Presentación / peso"
+                  value={nuevoProducto.presentacion || ""}
+                  onChange={(e) =>
+                    setNuevoProducto({
+                      ...nuevoProducto,
+                      presentacion: e.target.value,
                     })
                   }
                 />
@@ -577,7 +607,9 @@ export default function Productos({
                   <td>
                     <span
                       className={
-                        producto.activo ? "badge bg-success" : "badge bg-secondary"
+                        producto.activo
+                          ? "badge bg-success"
+                          : "badge bg-secondary"
                       }
                     >
                       {producto.activo ? "Activo" : "Desactivado"}
@@ -629,7 +661,10 @@ export default function Productos({
           className="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex align-items-center justify-content-center"
           style={{ zIndex: 2000 }}
         >
-          <div className="bg-white rounded shadow p-3 w-100" style={{ maxWidth: "520px" }}>
+          <div
+            className="bg-white rounded shadow p-3 w-100"
+            style={{ maxWidth: "520px" }}
+          >
             <div className="d-flex justify-content-between align-items-center mb-2">
               <h5 className="fw-bold mb-0">Escanear código de barras</h5>
               <button
@@ -654,7 +689,8 @@ export default function Productos({
             />
 
             <div className="text-muted small mt-2">
-              Funciona mejor desde el celular, con buena luz y apuntando al código completo.
+              Funciona mejor desde el celular, con buena luz y apuntando al
+              código completo.
             </div>
           </div>
         </div>

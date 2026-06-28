@@ -49,10 +49,10 @@ export async function crearNegocioConAdministrador(datos) {
 }
 
 export async function cambiarEstadoNegocio(negocioId, estado) {
-  const { error } = await supabase
-    .from("negocios")
-    .update({ estado })
-    .eq("id", negocioId);
+  const { error } = await supabase.rpc("cambiar_estado_negocio_maestro", {
+    p_negocio_id: negocioId,
+    p_estado: estado,
+  });
 
   if (error) throw error;
 }
@@ -98,7 +98,7 @@ export async function obtenerDetalleNegocioMaestro(negocioId) {
 
   const { data: usuarios, error: errorUsuarios } = await supabase
     .from("usuarios_app")
-    .select("id, nombre, usuario, rol, activo, creado_en")
+    .select("id, nombre, usuario, password, rol, activo, creado_en")
     .eq("negocio_id", negocioId)
     .order("creado_en", { ascending: false });
 
@@ -128,4 +128,72 @@ export async function obtenerDetalleNegocioMaestro(negocioId) {
     productos: productos || [],
     ventas: ventas || [],
   };
+}
+
+
+
+export async function obtenerAdministradorDeNegocio(negocioId) {
+  const { data, error } = await supabase
+    .from("usuarios_app")
+    .select("id, negocio_id, nombre, usuario, rol, activo")
+    .eq("negocio_id", negocioId)
+    .eq("rol", "Administrador")
+    .eq("activo", true)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error("Este negocio no tiene administrador activo");
+
+  return {
+    id: data.id,
+    negocioId: data.negocio_id,
+    nombre: data.nombre,
+    usuario: data.usuario,
+    rol: data.rol,
+    activo: data.activo,
+  };
+}
+
+
+
+
+export async function obtenerCatalogoGlobalMaestro() {
+  const { data, error } = await supabase
+    .from("catalogo_global_productos")
+    .select("*")
+    .order("nombre", { ascending: true });
+
+  if (error) throw error;
+
+  return data || [];
+}
+
+
+export async function importarCatalogoGlobalMaestro(productos) {
+  if (!productos || productos.length === 0) {
+    return;
+  }
+
+  const productosLimpios = productos
+    .map((p) => ({
+      codigo: String(p.codigo || "").trim(),
+      nombre: String(p.nombre || "").trim(),
+      marca: String(p.marca || "").trim(),
+      categoria: String(p.categoria || "").trim(),
+      presentacion: String(p.presentacion || "").trim(),
+    }))
+    .filter((p) => p.codigo && p.nombre);
+
+  if (productosLimpios.length === 0) {
+    throw new Error("El archivo no tiene productos válidos");
+  }
+
+  const { error } = await supabase
+    .from("catalogo_global_productos")
+    .upsert(productosLimpios, {
+      onConflict: "codigo",
+    });
+
+  if (error) throw error;
 }

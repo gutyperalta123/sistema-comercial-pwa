@@ -321,7 +321,7 @@ export default function App() {
       setPantalla(usuario.rol === "Administrador" ? "dashboard" : "venta");
     } catch (error) {
       console.error(error);
-      alert("Usuario o contraseña incorrectos");
+      alert(error.message || "Usuario o contraseña incorrectos");
     }
   };
 
@@ -1786,7 +1786,17 @@ export default function App() {
   }
 
   if (esSuperAdmin) {
-    return <PanelMaestro cerrarSesion={cerrarSesion} />;
+  return (
+    <PanelMaestro
+      cerrarSesion={cerrarSesion}
+      entrarComoNegocio={(usuarioSoporte) => {
+        setUsuarioActual(usuarioSoporte);
+        setEsSuperAdmin(false);
+        setLogueado(true);
+        setPantalla("dashboard");
+      }}
+    />
+  );
   }
 
   return (

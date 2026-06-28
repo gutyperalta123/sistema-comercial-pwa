@@ -55,6 +55,17 @@ export default function ModalVerNegocio({
               <strong>Email:</strong> {negocio.email_dueno || "-"}
             </p>
 
+
+            <p className="mb-2">
+              <strong>Usuario administrador:</strong>{" "}
+               {detalle?.usuarios?.find((u) => u.rol === "Administrador")?.usuario || "-"}
+            </p>
+
+            <p className="mb-2">
+               <strong>Contraseña administrador:</strong>{" "}
+               {detalle?.usuarios?.find((u) => u.rol === "Administrador")?.password || "-"}
+            </p>
+
             <p className="mb-2">
               <strong>Estado:</strong>{" "}
               <span

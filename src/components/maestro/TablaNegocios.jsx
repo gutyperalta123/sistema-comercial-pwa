@@ -5,6 +5,7 @@ export default function TablaNegocios({
   onEditarNegocio,
   onVerNegocio,
   onCambiarEstadoNegocio,
+  onIngresarNegocio,
   guardando,
 }) {
   return (
@@ -29,7 +30,7 @@ export default function TablaNegocios({
                 <th>Plan</th>
                 <th>Vence</th>
                 <th>Total vendido</th>
-                <th style={{ width: 300 }}>Acciones</th>
+                <th style={{ width: 390 }}>Acciones</th>
               </tr>
             </thead>
 
@@ -76,6 +77,14 @@ export default function TablaNegocios({
                           disabled={guardando}
                         >
                           Ver
+                        </button>
+
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => onIngresarNegocio(n)}
+                          disabled={guardando}
+                        >
+                          Ingresar
                         </button>
 
                         <button

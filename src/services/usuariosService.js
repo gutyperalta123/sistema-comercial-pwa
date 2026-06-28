@@ -9,26 +9,37 @@ export async function obtenerUsuarios() {
     .eq("negocio_id", NEGOCIO_ID)
     .order("nombre");
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 
-  return data;
+  return data || [];
 }
 
 export async function loginUsuario(usuario, password) {
-  const { data, error } = await supabase
-    .from("usuarios_app")
-    .select("*")
-    .eq("usuario", usuario)
-    .eq("password", password)
-    .single();
+  const { data, error } = await supabase.rpc("login_usuario_app", {
+    p_usuario: usuario,
+    p_password: password,
+  });
 
-  if (error) {
-    throw error;
+  if (error) throw error;
+
+  if (!data || data.length === 0) {
+    throw new Error(
+      "Usuario incorrecto, usuario suspendido o negocio bloqueado."
+    );
   }
 
-  return data;
+  const usuarioData = data[0];
+
+  return {
+    id: usuarioData.id,
+    negocio_id: usuarioData.negocio_id,
+    nombre: usuarioData.nombre,
+    usuario: usuarioData.usuario,
+    rol: usuarioData.rol,
+    activo: usuarioData.activo,
+    negocio_nombre: usuarioData.negocio_nombre,
+    negocio_estado: usuarioData.negocio_estado,
+  };
 }
 
 export async function crearUsuario(nuevoUsuario) {
@@ -41,9 +52,7 @@ export async function crearUsuario(nuevoUsuario) {
     activo: true,
   });
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 }
 
 export async function cambiarPassword(usuarioId, nuevaPassword) {
@@ -54,9 +63,7 @@ export async function cambiarPassword(usuarioId, nuevaPassword) {
     })
     .eq("id", usuarioId);
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 }
 
 export async function cambiarEstadoUsuario(usuarioId, activo) {
@@ -67,7 +74,5 @@ export async function cambiarEstadoUsuario(usuarioId, activo) {
     })
     .eq("id", usuarioId);
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 }

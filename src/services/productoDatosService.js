@@ -1,149 +1,113 @@
+import { supabase } from "./supabaseClient";
+
 export async function buscarDatosProductoPorCodigo(codigo) {
   const codigoLimpio = String(codigo || "").trim();
-  if (!codigoLimpio) return null;
 
-  const resultados = [
-    await buscarEnOpenFoodFacts(codigoLimpio),
-    await buscarEnUpcItemDb(codigoLimpio),
-    await buscarEnBarcodeMonster(codigoLimpio),
-  ].filter(Boolean);
+  if (!codigoLimpio) {
+    return null;
+  }
 
-  if (resultados.length === 0) return null;
+  const productoGlobal = await buscarEnCatalogoGlobal(codigoLimpio);
 
-  return unirResultados(codigoLimpio, resultados);
-}
+  if (productoGlobal) {
+    return productoGlobal;
+  }
 
-async function buscarEnOpenFoodFacts(codigo) {
-  const urls = [
-    `https://world.openfoodfacts.org/api/v2/product/${codigo}.json`,
-    `https://es.openfoodfacts.org/api/v2/product/${codigo}.json`,
-  ];
+  const productoInternet = await buscarEnOpenFoodFacts(codigoLimpio);
 
-  for (const url of urls) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) continue;
-
-      const data = await res.json();
-      if (data?.status !== 1 || !data.product) continue;
-
-      const p = data.product;
-
-      return limpiarProducto({
-        codigo,
-        nombre:
-          p.product_name_es ||
-          p.product_name ||
-          p.generic_name_es ||
-          p.generic_name ||
-          "",
-        marca: p.brands || p.brand_owner || "",
-        categoria:
-          p.categories ||
-          p.categories_tags?.[0]?.replace("en:", "").replace(/-/g, " ") ||
-          "",
-        descripcion: p.quantity || p.packaging || p.labels || "",
-      });
-    } catch {
-      continue;
-    }
+  if (productoInternet) {
+    return productoInternet;
   }
 
   return null;
 }
 
-async function buscarEnUpcItemDb(codigo) {
+async function buscarEnCatalogoGlobal(codigo) {
+  const { data, error } = await supabase
+    .from("catalogo_global_productos")
+    .select("codigo, nombre, marca, categoria, presentacion")
+    .eq("codigo", codigo)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error buscando en catálogo global:", error);
+    return null;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    codigo: limpiarTextoProducto(data.codigo),
+    nombre: limpiarTextoProducto(data.nombre),
+    marca: limpiarTextoProducto(data.marca),
+    categoria: limpiarTextoProducto(data.categoria),
+    presentacion: limpiarTextoProducto(data.presentacion),
+    origen: "catalogo_global",
+  };
+}
+
+async function buscarEnOpenFoodFacts(codigo) {
   try {
-    const res = await fetch(
-      `https://api.upcitemdb.com/prod/trial/lookup?upc=${codigo}`
+    const respuesta = await fetch(
+      `https://world.openfoodfacts.org/api/v2/product/${codigo}.json`
     );
 
-    if (!res.ok) return null;
+    if (!respuesta.ok) {
+      return null;
+    }
 
-    const data = await res.json();
-    const item = data?.items?.[0];
+    const data = await respuesta.json();
 
-    if (!item) return null;
+    if (!data || data.status !== 1 || !data.product) {
+      return null;
+    }
 
-    return limpiarProducto({
+    const producto = data.product;
+
+    const nombre =
+      producto.product_name_es ||
+      producto.product_name ||
+      producto.generic_name_es ||
+      producto.generic_name ||
+      "";
+
+    const marca = producto.brands || producto.brand_owner || "";
+
+    const categoria =
+      producto.categories_tags?.[0]
+        ?.replace("en:", "")
+        ?.replace(/-/g, " ") ||
+      producto.categories ||
+      "";
+
+    const presentacion =
+      producto.quantity ||
+      producto.product_quantity_unit ||
+      producto.serving_size ||
+      "";
+
+    if (!nombre && !marca && !categoria) {
+      return null;
+    }
+
+    return {
       codigo,
-      nombre: item.title || "",
-      marca: item.brand || "",
-      categoria: item.category || "",
-      descripcion: item.description || item.size || "",
-    });
-  } catch {
+      nombre: limpiarTextoProducto(nombre),
+      marca: limpiarTextoProducto(marca),
+      categoria: limpiarTextoProducto(categoria),
+      presentacion: limpiarTextoProducto(presentacion),
+      origen: "open_food_facts",
+    };
+  } catch (error) {
+    console.error("Error buscando datos del producto:", error);
     return null;
   }
 }
 
-async function buscarEnBarcodeMonster(codigo) {
-  try {
-    const res = await fetch(`https://barcode.monster/api/${codigo}`);
-
-    if (!res.ok) return null;
-
-    const data = await res.json();
-
-    return limpiarProducto({
-      codigo,
-      nombre: data.description || data.title || "",
-      marca: data.company || data.brand || "",
-      categoria: data.category || "",
-      descripcion: data.size || data.quantity || "",
-    });
-  } catch {
-    return null;
-  }
-}
-
-function unirResultados(codigo, resultados) {
-  const producto = {
-    codigo,
-    nombre: "",
-    marca: "",
-    categoria: "",
-    descripcion: "",
-  };
-
-  for (const r of resultados) {
-    producto.nombre = producto.nombre || r.nombre;
-    producto.marca = producto.marca || r.marca;
-    producto.categoria = producto.categoria || r.categoria;
-    producto.descripcion = producto.descripcion || r.descripcion;
-  }
-
-  if (!producto.nombre && !producto.marca && !producto.categoria) {
-    return null;
-  }
-
-  let nombreFinal = producto.nombre;
-
-  if (producto.descripcion && !nombreFinal.includes(producto.descripcion)) {
-    nombreFinal = `${nombreFinal} ${producto.descripcion}`.trim();
-  }
-
-  return {
-    codigo,
-    nombre: limpiarTexto(nombreFinal),
-    marca: limpiarTexto(producto.marca),
-    categoria: limpiarTexto(producto.categoria),
-  };
-}
-
-function limpiarProducto(producto) {
-  return {
-    codigo: producto.codigo,
-    nombre: limpiarTexto(producto.nombre),
-    marca: limpiarTexto(producto.marca),
-    categoria: limpiarTexto(producto.categoria),
-    descripcion: limpiarTexto(producto.descripcion),
-  };
-}
-
-function limpiarTexto(texto) {
+function limpiarTextoProducto(texto) {
   return String(texto || "")
-    .replace(/_/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
