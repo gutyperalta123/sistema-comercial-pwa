@@ -39,6 +39,7 @@ export function useProductos() {
 
   const limpiarFormularioProducto = () => {
     setProductoEditando(null);
+
     setNuevoProducto({
       codigo: "",
       nombre: "",
@@ -54,7 +55,7 @@ export function useProductos() {
     });
   };
 
-  const editarProducto = (producto, setPantalla) => {
+  const prepararEdicionProducto = (producto) => {
     setProductoEditando(producto);
 
     setNuevoProducto({
@@ -71,23 +72,9 @@ export function useProductos() {
       proveedor: producto.proveedor,
       vencimiento: producto.vencimiento,
     });
-
-    setPantalla("productos");
   };
 
-  const guardarProducto = async ({ e, esAdmin }) => {
-    e.preventDefault();
-
-    if (!esAdmin) {
-      alert("Solo el administrador puede cargar productos");
-      return;
-    }
-
-    if (!nuevoProducto.codigo || !nuevoProducto.nombre || !nuevoProducto.precioVenta) {
-      alert("Completá código, nombre y precio de venta");
-      return;
-    }
-
+  const guardarProductoBase = async ({ nuevoProducto, productoEditando }) => {
     if (productoEditando) {
       await actualizarProducto(nuevoProducto);
       alert("Producto actualizado correctamente");
@@ -101,7 +88,7 @@ export function useProductos() {
     await cargarProductos();
   };
 
-  const cambiarEstadoProducto = async (producto) => {
+  const cambiarEstadoProductoBase = async (producto) => {
     const activar = !producto.activo;
 
     const confirmar = confirm(
@@ -167,9 +154,9 @@ export function useProductos() {
     setNuevoProducto,
 
     limpiarFormularioProducto,
-    editarProducto,
-    guardarProducto,
-    cambiarEstadoProducto,
+    prepararEdicionProducto,
+    guardarProductoBase,
+    cambiarEstadoProductoBase,
 
     productosFiltrados,
     productosActivos,

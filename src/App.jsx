@@ -117,7 +117,7 @@ export default function App() {
   const [descuentoPromociones, setDescuentoPromociones] = useState(0);
 
   const [historialVentas, setHistorialVentas] = useState([]);
-  const [productos, setProductos] = useState([]);
+ 
   
   const [pedidos, setPedidos] = useState([]);
   const [lotes, setLotes] = useState([]);
@@ -131,12 +131,7 @@ export default function App() {
   const [esSuperAdmin, setEsSuperAdmin] = useState(false);
   
 
-  const [busquedaProducto, setBusquedaProducto] = useState("");
-  const [productoEditando, setProductoEditando] = useState(null);
-  const [productoCargaRapida, setProductoCargaRapida] = useState(null);
-  const [codigoCargaRapida, setCodigoCargaRapida] = useState("");
-  const [cantidadCargaRapida, setCantidadCargaRapida] = useState("1");
-  const [vencimientoCargaRapida, setVencimientoCargaRapida] = useState("");
+  
 
   const [productosRevisados, setProductosRevisados] = useState([]);
 
@@ -173,24 +168,39 @@ export default function App() {
   
    
 
-  const [nuevoProducto, setNuevoProducto] = useState({
-    codigo: "",
-    nombre: "",
-    marca: "",
-    categoria: "",
-    precioCompra: "",
-    precioVenta: "",
-    stock: "",
-    minimo: "",
-    proveedor: "",
-    vencimiento: "",
-  });
+  
 
  
 
   const esAdmin = usuarioActual?.rol === "Administrador";
 
-  const productosHook = useProductos();
+  const {
+    productos,
+    setProductos,
+    cargarProductos,
+    busquedaProducto,
+    setBusquedaProducto,
+    productoEditando,
+    productoCargaRapida,
+    setProductoCargaRapida,
+    codigoCargaRapida,
+    setCodigoCargaRapida,
+    cantidadCargaRapida,
+    setCantidadCargaRapida,
+    vencimientoCargaRapida,
+    setVencimientoCargaRapida,
+    nuevoProducto,
+    setNuevoProducto,
+    limpiarFormularioProducto,
+    prepararEdicionProducto,
+    guardarProductoBase,
+    cambiarEstadoProductoBase,
+    productosFiltrados,
+    productosActivos,
+    productosReponer,
+  } = useProductos();
+
+
   const {
     configuracion,
     setConfiguracion,
@@ -337,15 +347,7 @@ export default function App() {
     setUltimoCierreResultado(null);
   };
 
-  const cargarProductos = async () => {
-    try {
-      const productosBase = await obtenerTodosLosProductos();
-      setProductos(productosBase);
-    } catch (error) {
-      console.error(error);
-      alert("Error al cargar productos desde Supabase");
-    }
-  };
+  
 
   const cargarHistorialVentas = async () => {
     try {
@@ -501,67 +503,20 @@ export default function App() {
 
   
 
-  const limpiarFormularioProducto = () => {
-    setProductoEditando(null);
-    setNuevoProducto({
-      codigo: "",
-      nombre: "",
-      marca: "",
-      categoria: "",
-      precioCompra: "",
-      precioVenta: "",
-      stock: "",
-      minimo: "",
-      proveedor: "",
-      vencimiento: "",
-    });
-  };
+  
 
   const editarProducto = (producto) => {
-    setProductoEditando(producto);
-
-    setNuevoProducto({
-      id: producto.id,
-      codigo: producto.codigo,
-      nombre: producto.nombre,
-      marca: producto.marca,
-      categoria: producto.categoria,
-      precioCompra: producto.precioCompra,
-      precioVenta: producto.precioVenta,
-      stock: producto.stock,
-      minimo: producto.minimo,
-      proveedor: producto.proveedor,
-      vencimiento: producto.vencimiento,
-    });
-
+    prepararEdicionProducto(producto);
     setPantalla("productos");
   };
 
   const cambiarEstadoProducto = async (producto) => {
-    const activar = !producto.activo;
-
-    const confirmar = confirm(
-      activar
-        ? `¿Querés volver a activar "${producto.nombre}"?`
-        : `¿Querés desactivar "${producto.nombre}"? No se borra el historial.`
-    );
-
-    if (!confirmar) return;
-
     try {
-      if (activar) {
-        await activarProducto(producto.id);
-        alert("Producto activado correctamente");
-      } else {
-        await desactivarProducto(producto.id);
-        alert("Producto desactivado correctamente");
-      }
-
-      await cargarProductos();
-      await cargarLotes();
+    await cambiarEstadoProductoBase(producto);
+    await cargarLotes();
     } catch (error) {
-      console.error(error);
-      alert("Error al cambiar estado del producto: " + error.message);
+    console.error(error);
+    alert("Error al cambiar estado del producto: " + error.message);
     }
   };
 
@@ -686,17 +641,7 @@ export default function App() {
   }
 };
 
-  const productosFiltrados = productos.filter(
-    (producto) =>
-      producto.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-      String(producto.codigo).includes(busquedaProducto)
-  );
-
-  const productosActivos = productos.filter((producto) => producto.activo);
-
-  const productosReponer = productosActivos.filter(
-    (producto) => producto.stock <= producto.minimo
-  );
+  
 
   const calcularDiasVencimiento = (fecha) => {
     if (!fecha) return null;
@@ -1091,31 +1036,21 @@ export default function App() {
     if (!esAdmin) {
       alert("Solo el administrador puede cargar productos");
       return;
-    }
+     }
 
-    if (
-      !nuevoProducto.codigo ||
-      !nuevoProducto.nombre ||
-      !nuevoProducto.precioVenta
-    ) {
-      alert("Completá código, nombre y precio de venta");
-      return;
+    if (!nuevoProducto.codigo || !nuevoProducto.nombre || !nuevoProducto.precioVenta) {
+    alert("Completá código, nombre y precio de venta");
+    return;
     }
 
     try {
-      if (productoEditando) {
-        await actualizarProducto(nuevoProducto);
-        alert("Producto actualizado correctamente");
-      } else {
-        await crearProducto(nuevoProducto);
-        await guardarProductoEnCatalogoGlobal(nuevoProducto);
-        alert("Producto guardado correctamente");
-      }
-
-      limparDespuesProducto();
-    } catch (error) {
-      console.error(error);
-      alert("Error al guardar producto: " + error.message);
+    await guardarProductoBase({
+      nuevoProducto,
+      productoEditando,
+    });
+     } catch (error) {
+    console.error(error);
+    alert("Error al guardar producto: " + error.message);
     }
   };
 
