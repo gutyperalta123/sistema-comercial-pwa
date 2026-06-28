@@ -1,6 +1,13 @@
 
 
-import { buscarDatosProductoPorCodigo } from "./services/productoDatosService";
+import { useUsuarios } from "./hooks/useUsuarios";
+import { useConfiguracion } from "./hooks/useConfiguracion";
+import { useProductos } from "./hooks/useProductos";
+import { useLogin } from "./hooks/useLogin";
+import {
+  buscarDatosProductoPorCodigo,
+  guardarProductoEnCatalogoGlobal,
+} from "./services/productoDatosService";
 import { useEffect, useState } from "react";
 import "./App.css";
 import CierreCaja from "./pages/CierreCaja";
@@ -111,7 +118,7 @@ export default function App() {
 
   const [historialVentas, setHistorialVentas] = useState([]);
   const [productos, setProductos] = useState([]);
-  const [usuarios, setUsuarios] = useState([]);
+  
   const [pedidos, setPedidos] = useState([]);
   const [lotes, setLotes] = useState([]);
   const [movimientosStock, setMovimientosStock] = useState([]);
@@ -122,7 +129,7 @@ export default function App() {
   const [promociones, setPromociones] = useState([]);
   const [usuarioActual, setUsuarioActual] = useState(null);
   const [esSuperAdmin, setEsSuperAdmin] = useState(false);
-  const [configuracion, setConfiguracion] = useState(null);
+  
 
   const [busquedaProducto, setBusquedaProducto] = useState("");
   const [productoEditando, setProductoEditando] = useState(null);
@@ -163,11 +170,8 @@ export default function App() {
     motivo: "",
   });
 
-  const [nuevoUsuario, setNuevoUsuario] = useState({
-    nombre: "",
-    usuario: "",
-    rol: "Empleado",
-  });
+  
+   
 
   const [nuevoProducto, setNuevoProducto] = useState({
     codigo: "",
@@ -182,12 +186,45 @@ export default function App() {
     vencimiento: "",
   });
 
-  const [passwordData, setPasswordData] = useState({
-    nuevaPassword: "",
-    repetirPassword: "",
-  });
+ 
 
   const esAdmin = usuarioActual?.rol === "Administrador";
+
+  const productosHook = useProductos();
+  const {
+    configuracion,
+    setConfiguracion,
+    cargarConfiguracion,
+    guardarConfiguracion,
+  } = useConfiguracion();
+
+
+  const {
+    usuarios,
+    setUsuarios,
+    cargarUsuarios,
+    nuevoUsuario,
+    setNuevoUsuario,
+    passwordData,
+    setPasswordData,
+    guardarUsuario,
+    cambiarMiPassword,
+    cambiarEstadoEmpleado,
+  } = useUsuarios();
+
+  const cambiarMiPasswordUsuarioActual = (e) => {
+    return cambiarMiPassword(usuarioActual, e);
+  };
+
+
+  const { iniciarSesionSistema, entrarComoNegocioDesdePanel } = useLogin({
+  setUsuarioActual,
+  setEsSuperAdmin,
+  setLogueado,
+  setPantalla,
+  asegurarAperturaCajaUsuario,
+  setUltimoCierreResultado,
+  });
 
   useEffect(() => {
     if (logueado && !esSuperAdmin) {
@@ -275,53 +312,11 @@ export default function App() {
   const iniciarSesion = async (e) => {
     e.preventDefault();
 
-    if (!loginData.usuario || !loginData.password) {
-      alert("Ingresá usuario y contraseña");
-      return;
-    }
-
     try {
-      const superAdmin = await loginSuperAdmin(
-        loginData.usuario,
-        loginData.password
-      );
-
-      setUsuarioActual(superAdmin);
-      setEsSuperAdmin(true);
-      setLogueado(true);
-      setPantalla("panel-maestro");
-      return;
-    } catch {
-      // Si no es super admin, continúa con el login normal del negocio.
-    }
-
-    try {
-      const usuario = await loginUsuario(loginData.usuario, loginData.password);
-
-      if (!usuario.activo) {
-        alert("Este usuario está desactivado");
-        return;
-      }
-
-      const usuarioSistema = {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        usuario: usuario.usuario,
-        rol: usuario.rol,
-        activo: usuario.activo,
-        negocio: "Kiosco San Martín",
-      };
-
-      setUsuarioActual(usuarioSistema);
-      setEsSuperAdmin(false);
-      await asegurarAperturaCajaUsuario(usuarioSistema);
-      setUltimoCierreResultado(null);
-
-      setLogueado(true);
-      setPantalla(usuario.rol === "Administrador" ? "dashboard" : "venta");
+      await iniciarSesionSistema(loginData);
     } catch (error) {
-      console.error(error);
-      alert(error.message || "Usuario o contraseña incorrectos");
+    console.error(error);
+    alert(error.message || "Usuario o contraseña incorrectos");
     }
   };
 
@@ -372,25 +367,8 @@ export default function App() {
     }
   };
 
-  const cargarUsuarios = async () => {
-    try {
-      const usuariosBase = await obtenerUsuarios();
-      setUsuarios(usuariosBase);
-    } catch (error) {
-      console.error(error);
-      alert("Error al cargar usuarios");
-    }
-  };
-  const cargarConfiguracion = async () => {
-    try {
-      const data = await obtenerConfiguracionNegocio();
-      setConfiguracion(data);
-    } catch (error) {
-      console.error(error);
-      alert("Error al cargar configuración del negocio");
-    }
-  };
-
+  
+  
   const cargarLotes = async () => {
     try {
       const lotesBase = await obtenerLotes();
@@ -521,17 +499,7 @@ export default function App() {
     }
   };
 
-  const guardarConfiguracion = async (e) => {
-    e.preventDefault();
-
-    try {
-      await guardarConfiguracionNegocio(configuracion);
-      alert("Configuración guardada correctamente");
-    } catch (error) {
-      console.error(error);
-      alert("Error al guardar configuración: " + error.message);
-    }
-  };
+  
 
   const limpiarFormularioProducto = () => {
     setProductoEditando(null);
@@ -855,75 +823,11 @@ export default function App() {
     setPantalla(usuario.rol === "Administrador" ? "dashboard" : "venta");
   };
 
-  const guardarUsuario = async (e) => {
-    e.preventDefault();
+  
 
-    if (!nuevoUsuario.nombre || !nuevoUsuario.usuario) {
-      alert("Completá nombre y usuario");
-      return;
-    }
+  
 
-    try {
-      await crearUsuario({ ...nuevoUsuario, password: "1234" });
-
-      setNuevoUsuario({
-        nombre: "",
-        usuario: "",
-        rol: "Empleado",
-      });
-
-      await cargarUsuarios();
-
-      alert("Usuario creado correctamente. Contraseña inicial: 1234");
-    } catch (error) {
-      console.error(error);
-      alert("Error al crear usuario: " + error.message);
-    }
-  };
-
-  const cambiarMiPassword = async (e) => {
-    e.preventDefault();
-
-    if (!passwordData.nuevaPassword || !passwordData.repetirPassword) {
-      alert("Completá ambos campos");
-      return;
-    }
-
-    if (passwordData.nuevaPassword !== passwordData.repetirPassword) {
-      alert("Las contraseñas no coinciden");
-      return;
-    }
-
-    try {
-      await cambiarPassword(usuarioActual.id, passwordData.nuevaPassword);
-
-      setPasswordData({
-        nuevaPassword: "",
-        repetirPassword: "",
-      });
-
-      alert("Contraseña cambiada correctamente");
-    } catch (error) {
-      console.error(error);
-      alert("Error al cambiar contraseña: " + error.message);
-    }
-  };
-
-  const cambiarEstadoEmpleado = async (usuarioId, activo) => {
-    try {
-      await cambiarEstadoUsuario(usuarioId, activo);
-      await cargarUsuarios();
-
-      alert(
-        activo
-          ? "Usuario activado correctamente"
-          : "Usuario desactivado correctamente"
-      );
-    } catch (error) {
-      console.error(error);
-      alert("Error al actualizar usuario: " + error.message);
-    }
-  };
+  
 
   const agregarProductoAVenta = (producto) => {
     if (!producto.activo) {
@@ -1204,7 +1108,8 @@ export default function App() {
         alert("Producto actualizado correctamente");
       } else {
         await crearProducto(nuevoProducto);
-        alert("Producto guardado correctamente en Supabase");
+        await guardarProductoEnCatalogoGlobal(nuevoProducto);
+        alert("Producto guardado correctamente");
       }
 
       limparDespuesProducto();
@@ -1789,12 +1694,7 @@ export default function App() {
   return (
     <PanelMaestro
       cerrarSesion={cerrarSesion}
-      entrarComoNegocio={(usuarioSoporte) => {
-        setUsuarioActual(usuarioSoporte);
-        setEsSuperAdmin(false);
-        setLogueado(true);
-        setPantalla("dashboard");
-      }}
+      entrarComoNegocio={entrarComoNegocioDesdePanel}
     />
   );
   }
@@ -1987,7 +1887,7 @@ export default function App() {
             usuarioActual={usuarioActual}
             passwordData={passwordData}
             setPasswordData={setPasswordData}
-            cambiarMiPassword={cambiarMiPassword}
+            cambiarMiPassword={cambiarMiPasswordUsuarioActual}
           />
         )}
 

@@ -111,3 +111,28 @@ function limpiarTextoProducto(texto) {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+
+export async function guardarProductoEnCatalogoGlobal(producto) {
+  const codigo = String(producto.codigo || "").trim();
+  const nombre = String(producto.nombre || "").trim();
+
+  if (!codigo || !nombre) return;
+
+  const { error } = await supabase
+    .from("catalogo_global_productos")
+    .upsert(
+      {
+        codigo,
+        nombre,
+        marca: String(producto.marca || "").trim(),
+        categoria: String(producto.categoria || "").trim(),
+        presentacion: String(producto.presentacion || "").trim(),
+      },
+      {
+        onConflict: "codigo",
+      }
+    );
+
+  if (error) throw error;
+}

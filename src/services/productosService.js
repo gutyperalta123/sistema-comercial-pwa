@@ -1,6 +1,21 @@
 import { supabase } from "./supabaseClient";
 
-const NEGOCIO_ID = "9c6430fd-c816-4870-b92e-7432b51cf400";
+function obtenerNegocioId() {
+  const usuarioGuardado = localStorage.getItem("usuarioActual");
+
+  if (!usuarioGuardado) {
+    throw new Error("No hay usuario logueado");
+  }
+
+  const usuario = JSON.parse(usuarioGuardado);
+  const negocioId = usuario.negocio_id || usuario.negocioId;
+
+  if (!negocioId) {
+    throw new Error("El usuario no tiene negocio asignado");
+  }
+
+  return negocioId;
+}
 
 function normalizarPrecio(valor) {
   if (valor === null || valor === undefined || valor === "") return 0;
@@ -9,66 +24,64 @@ function normalizarPrecio(valor) {
   return Number(texto || 0);
 }
 
+function mapearProducto(p) {
+  return {
+    id: p.id,
+    codigo: p.codigo,
+    nombre: p.nombre,
+    marca: p.marca || "",
+    categoria: p.categoria || "",
+    presentacion: p.presentacion || "",
+    precioCompra: Number(p.precio_compra || 0),
+    precioVenta: Number(p.precio_venta || 0),
+    stock: Number(p.stock || 0),
+    minimo: Number(p.minimo || 0),
+    proveedor: p.proveedor || "",
+    vencimiento: p.vencimiento || "",
+    activo: p.activo,
+  };
+}
+
 export async function obtenerProductos() {
+  const negocioId = obtenerNegocioId();
+
   const { data, error } = await supabase
     .from("productos")
     .select("*")
-    .eq("negocio_id", NEGOCIO_ID)
+    .eq("negocio_id", negocioId)
     .eq("activo", true)
     .order("creado_en", { ascending: false });
 
   if (error) throw error;
 
-  return data.map((p) => ({
-    id: p.id,
-    codigo: p.codigo,
-    nombre: p.nombre,
-    marca: p.marca || "",
-    categoria: p.categoria || "",
-    precioCompra: Number(p.precio_compra || 0),
-    precioVenta: Number(p.precio_venta || 0),
-    stock: Number(p.stock || 0),
-    minimo: Number(p.minimo || 0),
-    proveedor: p.proveedor || "",
-    vencimiento: p.vencimiento || "",
-    activo: p.activo,
-  }));
+  return (data || []).map(mapearProducto);
 }
 
 export async function obtenerTodosLosProductos() {
+  const negocioId = obtenerNegocioId();
+
   const { data, error } = await supabase
     .from("productos")
     .select("*")
-    .eq("negocio_id", NEGOCIO_ID)
+    .eq("negocio_id", negocioId)
     .order("creado_en", { ascending: false });
 
   if (error) throw error;
 
-  return data.map((p) => ({
-    id: p.id,
-    codigo: p.codigo,
-    nombre: p.nombre,
-    marca: p.marca || "",
-    categoria: p.categoria || "",
-    precioCompra: Number(p.precio_compra || 0),
-    precioVenta: Number(p.precio_venta || 0),
-    stock: Number(p.stock || 0),
-    minimo: Number(p.minimo || 0),
-    proveedor: p.proveedor || "",
-    vencimiento: p.vencimiento || "",
-    activo: p.activo,
-  }));
+  return (data || []).map(mapearProducto);
 }
 
 export async function crearProducto(nuevoProducto) {
+  const negocioId = obtenerNegocioId();
   const codigoLimpio = String(nuevoProducto.codigo || "").trim();
 
   const productoData = {
-    negocio_id: NEGOCIO_ID,
+    negocio_id: negocioId,
     codigo: codigoLimpio,
     nombre: nuevoProducto.nombre,
     marca: nuevoProducto.marca,
     categoria: nuevoProducto.categoria,
+    presentacion: nuevoProducto.presentacion || "",
     precio_compra: normalizarPrecio(nuevoProducto.precioCompra),
     precio_venta: normalizarPrecio(nuevoProducto.precioVenta),
     stock: Number(nuevoProducto.stock || 0),
@@ -81,7 +94,7 @@ export async function crearProducto(nuevoProducto) {
   const { data: existente, error: buscarError } = await supabase
     .from("productos")
     .select("id")
-    .eq("negocio_id", NEGOCIO_ID)
+    .eq("negocio_id", negocioId)
     .eq("codigo", codigoLimpio)
     .maybeSingle();
 
@@ -110,6 +123,7 @@ export async function actualizarProducto(producto) {
       nombre: producto.nombre,
       marca: producto.marca,
       categoria: producto.categoria,
+      presentacion: producto.presentacion || "",
       precio_compra: normalizarPrecio(producto.precioCompra),
       precio_venta: normalizarPrecio(producto.precioVenta),
       stock: Number(producto.stock || 0),
