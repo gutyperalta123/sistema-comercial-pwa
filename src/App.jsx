@@ -1,6 +1,10 @@
 
 
 
+import VentasPage from "./pages/VentasPage";
+import ProductosPage from "./pages/ProductosPage";
+import UsuariosPage from "./pages/UsuariosPage";
+import ConfiguracionPage from "./pages/ConfiguracionPage";
 import { useAuthSession } from "./hooks/useAuthSession";
 import { usePromociones } from "./hooks/usePromociones";
 import { useUsuarios } from "./hooks/useUsuarios";
@@ -1693,7 +1697,7 @@ export default function App() {
         )}
 
         {pantalla === "venta" && (
-          <Ventas
+          <VentasPage
             metodoPago={metodoPago}
             setMetodoPago={setMetodoPago}
             montoEfectivo={montoEfectivo}
@@ -1719,7 +1723,7 @@ export default function App() {
         )}
 
         {pantalla === "productos" && esAdmin && (
-          <Productos
+          <ProductosPage
             esAdmin={esAdmin}
             nuevoProducto={nuevoProducto}
             setNuevoProducto={setNuevoProducto}
@@ -1807,21 +1811,21 @@ export default function App() {
         )}
 
         {pantalla === "usuarios" && esAdmin && (
-          <Usuarios
-            usuarios={usuarios}
-            nuevoUsuario={nuevoUsuario}
-            setNuevoUsuario={setNuevoUsuario}
-            guardarUsuario={guardarUsuario}
-            cambiarUsuario={cambiarUsuario}
-            cambiarEstadoEmpleado={cambiarEstadoEmpleado}
+          <UsuariosPage
+          usuarios={usuarios}
+          nuevoUsuario={nuevoUsuario}
+          setNuevoUsuario={setNuevoUsuario}
+          guardarUsuario={guardarUsuario}
+          cambiarUsuario={cambiarUsuario}
+          cambiarEstadoEmpleado={cambiarEstadoEmpleado}
           />
         )}
 
         {pantalla === "configuracion" && esAdmin && (
-          <Configuracion
-            configuracion={configuracion}
+          <ConfiguracionPage
+           configuracion={configuracion}
             setConfiguracion={setConfiguracion}
-            guardarConfiguracion={guardarConfiguracion}
+           guardarConfiguracion={guardarConfiguracion}
           />
         )}
       </main>
