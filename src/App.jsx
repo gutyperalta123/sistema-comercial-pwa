@@ -1,6 +1,4 @@
-
-
-
+import DashboardPage from "./pages/DashboardPage";
 import VentasPage from "./pages/VentasPage";
 import ProductosPage from "./pages/ProductosPage";
 import UsuariosPage from "./pages/UsuariosPage";
@@ -25,24 +23,21 @@ import Topbar from "./components/Topbar";
 import Caja from "./pages/Caja";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import Ventas from "./pages/Ventas";
-import Productos from "./pages/Productos";
+import CajaPage from "./pages/CajaPage";
+
 import Pedidos from "./pages/Pedidos";
 import Vencimientos from "./pages/Vencimientos";
-import Usuarios from "./pages/Usuarios";
+
 import MiCuenta from "./pages/MiCuenta";
-import Configuracion from "./pages/Configuracion";
+
 import Ticket from "./pages/Ticket";
 import AjustesStock from "./pages/AjustesStock";
 import Promociones from "./pages/Promociones";
 import PanelMaestro from "./pages/PanelMaestro";
 import { loginSuperAdmin } from "./services/maestroService";
-import {
-  obtenerPromociones,
-  crearPromocion as crearPromocionService,
-  cambiarEstadoPromocion as cambiarEstadoPromocionService,
-  eliminarPromocion as eliminarPromocionService,
-} from "./services/promocionesService";
+import { loginUsuario } from "./services/usuariosService";
+
+
 import {
   obtenerSolicitudesReaperturaCaja,
   crearSolicitudReaperturaCaja,
@@ -66,14 +61,7 @@ import {
   crearRetiroInterno,
 } from "./services/retirosService";
 
-import {
-  crearProducto,
-  obtenerTodosLosProductos,
-  actualizarProducto,
-  desactivarProducto,
-  activarProducto,
-  sumarStockProducto,
-} from "./services/productosService";
+import { sumarStockProducto } from "./services/productosService";
 
 import { guardarVenta } from "./services/ventasService";
 
@@ -83,18 +71,6 @@ import {
   recibirProductoDePedido,
 } from "./services/pedidosService";
 
-import {
-  obtenerUsuarios,
-  loginUsuario,
-  crearUsuario,
-  cambiarPassword,
-  cambiarEstadoUsuario,
-} from "./services/usuariosService";
-
-import {
-  obtenerConfiguracionNegocio,
-  guardarConfiguracionNegocio,
-} from "./services/configuracionService";
 
 
 // Servicios eliminados: se dejan como funciones vacías para que la app compile
@@ -1649,7 +1625,7 @@ export default function App() {
         />
 
         {pantalla === "dashboard" && esAdmin && (
-          <Dashboard
+          <DashboardPage
           esAdmin={esAdmin}
           totalVendidoHoy={totalVendidoHoy}
           gananciaHoy={gananciaHoy}
@@ -1680,7 +1656,7 @@ export default function App() {
         )}
 
         {pantalla === "caja" && esAdmin && (
-          <Caja
+          <CajaPage
             historialVentas={historialVentas}
             usuarioActual={usuarioActual}
             esAdmin={esAdmin}
