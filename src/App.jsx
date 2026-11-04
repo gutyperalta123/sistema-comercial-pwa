@@ -225,7 +225,7 @@ export default function App() {
   setEsSuperAdmin,
   setLogueado,
   setPantalla,
-  asegurarAperturaCajaUsuario,
+  asegurarAperturaCajaUsuario: (usuario) => asegurarAperturaCajaUsuario(usuario),
   setUltimoCierreResultado,
   });
 
